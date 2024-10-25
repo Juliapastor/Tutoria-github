@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmail } from '../SupabaseService';
+import Header from './Header';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -12,6 +13,10 @@ const Login = () => {
     navigate('/signup');}
 
   const handleSubmit = async (e) => {
+
+    <div>
+      <Header />
+    </div>
     
     e.preventDefault();
     try {

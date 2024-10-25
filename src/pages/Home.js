@@ -2,6 +2,9 @@ import React, { useEffect } from 'react'
 import { supabase } from '../supabase/client'
 import { useNavigate } from 'react-router-dom';
 import { signOut } from '../SupabaseService';
+import Header from './Header';
+import Login from './LoginEmail';
+import './Home.css'
 
 const Home = () => {
   
@@ -12,12 +15,11 @@ const Home = () => {
  
 
   return (
-    <div>Home
-      <button onClick={handleButtonClick}>Mi perfil</button>
-
-      <button onClick={signOut}>
-        Salir
-      </button>
+    <div className='body'>
+      <Header />
+      
+      <Login />
+      
     </div>
   )
 }

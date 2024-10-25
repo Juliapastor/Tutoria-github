@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../SupabaseService';
+import Header from './Header';
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -52,7 +53,11 @@ const SignUp = () => {
 
 
   return (
+    
+    
+      
     <div>
+      <Header />
       <form onSubmit={handleSubmit}>
         <input 
           placeholder='Fullname'

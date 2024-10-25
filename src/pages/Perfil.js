@@ -1,6 +1,8 @@
 import React from 'react'
 import { supabase } from '../SupabaseService'
 import { useNavigate } from 'react-router-dom';
+import './Perfil.css'
+import Header from './Header';
 
 const Perfil = () => {
   const navigate = useNavigate();
@@ -10,8 +12,9 @@ const Perfil = () => {
   
 
   return (
-    <div>Perfil
-      <button onClick={handleButtonClick}>Inicio</button>
+    <div>
+      <Header />
+      
     </div>
   )
 }
