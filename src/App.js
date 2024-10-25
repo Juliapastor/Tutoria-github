@@ -7,6 +7,7 @@ import Perfil from './pages/Perfil'
 import SignUp from './pages/SignUp';
 import { supabase } from './supabase/client';
 import NoExiste from './pages/NoExiste';
+import Calendario from './pages/Calendario';
 
 function App() {
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
@@ -20,6 +21,7 @@ function App() {
         <Route path='/login' element={<Login/>}/>
         <Route path='/perfil' element={<Perfil/>}/>
         <Route path='/signup' element={<SignUp/>}/>
+        <Route path='/calendario' element={<Calendario/>}/>
       </Routes>
 
     </div>
