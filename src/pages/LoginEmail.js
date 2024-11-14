@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmail } from '../SupabaseService';
 import Header from './Header';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthProvider';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,8 +11,7 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const navigate = useNavigate();
-  const handleButtonClick = () => {
-    navigate('/signup');}
+  const { login, user } = useAuth();
 
   const handleSubmit = async (e) => {
 
@@ -57,7 +58,7 @@ const Login = () => {
       </form>
       {success && <p style={{ color: 'green' }}>{success}</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      <button onClick={handleButtonClick}>Regístrate</button>
+      Forgot Password? <Link to={"/passwordreset"}>Click Here</Link>
     </div>
   );
 };
