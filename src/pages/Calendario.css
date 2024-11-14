@@ -1,0 +1,15 @@
+.body1 {
+    background-color: #0473ba;
+}
+
+.titulo {
+    display: flex;
+    margin-left: 250px;
+    margin-top: 20px;
+}
+
+
+.img3 {
+    width: 90px;
+    padding-right: 20px;
+}
