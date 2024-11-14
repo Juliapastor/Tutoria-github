@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { signInWithEmail } from '../SupabaseService';
 import Header from './Header';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthProvider';
+import { useAuth } from '../supabase/AuthProvider';
 
 const Login = () => {
   const [email, setEmail] = useState('');
