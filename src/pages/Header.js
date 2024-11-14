@@ -6,6 +6,7 @@ import img1 from './img/HeaderWebUniversae.png'
 import img2 from './img/universae.png'
 import './Calendario'
 
+
 const Header = () => {
   const navigate = useNavigate();
   const handleButtonClick = () => {
@@ -28,6 +29,7 @@ const Header = () => {
       <a href='tienda'>Tienda</a>
       <a href='tutorias'>Mis Tutorías</a>
       <a href='cerrarsesion'>Cerrar Sesión</a>
+    
       </div>
     </div>
   )
