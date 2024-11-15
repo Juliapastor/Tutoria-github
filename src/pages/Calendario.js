@@ -7,23 +7,56 @@ import Modal from 'react-modal';
 import { supabase } from '../supabaseClient';
 import './Calendario.css';
 import Header from './Header';
+import { useNavigate } from 'react-router-dom'; // 
 
 Modal.setAppElement('#root');
 
 const Calendario = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [infoModalIsOpen, setInfoModalIsOpen] = useState(false); // Modal para fines de semana
+  const [infoModalIsOpen, setInfoModalIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [appointmentTitle, setAppointmentTitle] = useState('');
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [isEmailValid, setIsEmailValid] = useState(true);
   const [successMessage, setSuccessMessage] = useState('');
   const [nextAppointment, setNextAppointment] = useState(null);
   const [pastAppointmentsModalOpen, setPastAppointmentsModalOpen] = useState(false);
   const [pastAppointments, setPastAppointments] = useState([]);
-  const [name, setName] = useState("");
+
+  useEffect(() => {
+    // Verificar si el usuario está autenticado y cargar perfil
+    const checkSessionAndLoadProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        <p>Por favor, Inicia Sesión</p>
+        navigate('/');
+        
+      } else {
+        await fetchUserProfile(session.user.id); // Cargar el perfil del usuario
+        await fetchAppointments();
+      }
+    };
+    checkSessionAndLoadProfile();
+  }, [navigate]);
+
+  const fetchUserProfile = async (userId) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('name, email')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error al cargar el perfil del usuario:', error);
+    } else {
+      setName(profile.name);   // Establece el nombre del perfil en el formulario
+      setEmail(profile.email); // Establece el email del perfil en el formulario
+    }
+  };
 
   const fetchPastAppointments = async () => {
     const currentDate = new Date().toISOString().split('T')[0];
@@ -75,19 +108,17 @@ const Calendario = () => {
     }
   };
 
+
   useEffect(() => {
     fetchAppointments();
   }, []);
 
-  // Función que abre el modal y establece la fecha seleccionada al hacer clic en un día
   const handleDateClick = (info) => {
     const selectedDay = new Date(info.dateStr).getDay();
 
     if (selectedDay === 0 || selectedDay === 6) {
-      // Si es sábado (6) o domingo (0), mostramos el modal informativo
       setInfoModalIsOpen(true);
     } else {
-      // Si no es fin de semana, abre el modal para agendar una cita
       setSelectedDate(info.dateStr);
       setModalIsOpen(true);
     }
@@ -95,9 +126,8 @@ const Calendario = () => {
 
   const closeModal = () => {
     setModalIsOpen(false);
-    setName("");
-    setEmail("");
-    setSelectedTime("");
+    setAppointmentTitle('');
+    setSelectedTime('');
   };
 
   const closeInfoModal = () => {
@@ -107,13 +137,13 @@ const Calendario = () => {
   const handleEmailChange = (e) => {
     const emailValue = e.target.value;
     setEmail(emailValue);
-    setIsEmailValid(isValidEmail(emailValue));
+    setIsEmailValid(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue));
   };
 
   const handleTimeSelect = async () => {
     const endTime = String(Number(selectedTime.split(':')[0]) + 1).padStart(2, '0') + ':00';
 
-    const { data, error } = await supabase.from('citas').insert([
+    const { error } = await supabase.from('citas').insert([
       {
         title: appointmentTitle,
         date: selectedDate,
@@ -212,8 +242,8 @@ const Calendario = () => {
          selectable={true}
          editable={true}
          events={events}
-         eventClick={handleEventClick}
-         dateClick={handleDateClick} // Añade dateClick aquí
+         eventClick={(clickInfo) => { /* función para manejar clic en evento */ }}
+         dateClick={handleDateClick}
          weekends={true}
          validRange={{
            start: currentDateString,
@@ -252,8 +282,8 @@ const Calendario = () => {
           Nombre de la cita:
           <input
             type="text"
-            value={appointmentTitle}
-            onChange={(e) => setAppointmentTitle(e.target.value)}
+            value={name}
+            readOnly
             placeholder="Introduce el nombre de la cita"
             style={{ margin: '10px 0', padding: '5px', width: '100%' }}
           />
@@ -262,12 +292,12 @@ const Calendario = () => {
         <label>
           Correo electrónico:
           <input
-            type="email"
-            value={email}
-            onChange={handleEmailChange}
-            placeholder="Introduce tu correo electrónico"
-            style={{ margin: '10px 0', padding: '5px', width: '100%' }}
-          />
+              type="email"
+              value={email}
+              onChange={handleEmailChange}
+              placeholder="Introduce tu correo electrónico"
+              style={{ margin: '10px 0', padding: '5px', width: '100%' }}
+            />
         </label>
         {!isEmailValid && (
           <p style={{ color: 'red' }}>Por favor, introduce un correo electrónico válido.</p>
@@ -412,3 +442,13 @@ const Calendario = () => {
 };
 
 export default Calendario;
+
+
+
+
+
+
+
+
+
+

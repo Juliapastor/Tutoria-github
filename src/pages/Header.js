@@ -5,6 +5,7 @@ import './Header.css'
 import img1 from './img/HeaderWebUniversae.png'
 import img2 from './img/universae.png'
 import './Calendario'
+import { useAuth } from '../supabase/AuthProvider';
 
 
 const Header = () => {
@@ -12,6 +13,12 @@ const Header = () => {
   const handleButtonClick = () => {
     navigate('/');
   }
+  const { user, setUser } = useAuth();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null); // Elimina el usuario del contexto
+  };
   
 
   return (
@@ -28,8 +35,14 @@ const Header = () => {
       <a href='perfil'>Perfil</a>
       <a href='tienda'>Tienda</a>
       <a href='tutorias'>Mis Tutorías</a>
-      <a href='cerrarsesion'>Cerrar Sesión</a>
-    
+      {user ? (
+        <>
+          <p>Bienvenido, {user.email}</p>
+          <button style={{backgroundColor: '#134c8f', border: 'none', color:'white', fontSize:'16px'}} onClick={handleLogout}>Cerrar sesión</button>
+        </>
+      ) : (
+        <a href='/'>Inicia Sesión</a>
+      )}
       </div>
     </div>
   )
