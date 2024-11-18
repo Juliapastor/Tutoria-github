@@ -8,6 +8,7 @@ import { supabase } from '../supabaseClient';
 import './Calendario.css';
 import Header from './Header';
 import { useNavigate } from 'react-router-dom'; // 
+import { useAuth } from '../supabase/AuthProvider';
 
 Modal.setAppElement('#root');
 
@@ -26,34 +27,38 @@ const Calendario = () => {
   const [nextAppointment, setNextAppointment] = useState(null);
   const [pastAppointmentsModalOpen, setPastAppointmentsModalOpen] = useState(false);
   const [pastAppointments, setPastAppointments] = useState([]);
+  const { user, setUser } = useAuth();
+  const [selectedEvent, setSelectedEvent] = useState(null);  // Almacenar la cita seleccionada
+  const [modalOpenIs, setModalOpenIs] = useState(false);
+
+  
 
   useEffect(() => {
-    // Verificar si el usuario está autenticado y cargar perfil
     const checkSessionAndLoadProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+  
       if (!session) {
-        <p>Por favor, Inicia Sesión</p>
-        navigate('/');
-        
+        navigate('/'); // Redirige si no hay sesión
       } else {
-        await fetchUserProfile(session.user.id); // Cargar el perfil del usuario
-        await fetchAppointments();
+        await fetchUserProfile(session.user.id); // Carga los datos del usuario
+        await fetchAppointments(); // Carga las citas del usuario
       }
     };
+  
     checkSessionAndLoadProfile();
   }, [navigate]);
 
   const fetchUserProfile = async (userId) => {
     const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('name, email')
+      .from('users')
+      .select('email')
       .eq('id', userId)
       .single();
-
+  
     if (error) {
       console.error('Error al cargar el perfil del usuario:', error);
     } else {
-      setName(profile.name);   // Establece el nombre del perfil en el formulario
+      setName(profile.title);   // Cambiado de profile.name a profile.title
       setEmail(profile.email); // Establece el email del perfil en el formulario
     }
   };
@@ -76,9 +81,6 @@ const Calendario = () => {
 
   const availableTimes = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
-  const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
 
   const fetchAppointments = async () => {
     const { data, error } = await supabase.from('citas').select().order('date', { ascending: true });
@@ -90,7 +92,7 @@ const Calendario = () => {
 
       setEvents(futureAppointments.map(cita => ({
         id: cita.id,
-        title: cita.title,
+        title: `${cita.email}`, // Información personalizada
         start: `${cita.date}T${cita.start_time}:00`,
         end: `${cita.date}T${cita.end_time}:00`,
       })));
@@ -98,7 +100,7 @@ const Calendario = () => {
       if (futureAppointments.length > 0) {
         const next = futureAppointments[0];
         setNextAppointment({
-          title: next.title,
+          email: user.email,
           date: next.date,
           start_time: next.start_time,
         });
@@ -107,6 +109,8 @@ const Calendario = () => {
       }
     }
   };
+
+  
 
 
   useEffect(() => {
@@ -145,11 +149,11 @@ const Calendario = () => {
 
     const { error } = await supabase.from('citas').insert([
       {
-        title: appointmentTitle,
+        email: user.email,
         date: selectedDate,
         start_time: selectedTime,
         end_time: endTime,
-        email: email,
+        
       },
     ]);
 
@@ -166,16 +170,17 @@ const Calendario = () => {
   };
 
   const handleEventClick = async (clickInfo) => {
-    const eventId = clickInfo.event.id;
-    if (window.confirm(`¿Deseas eliminar la cita "${clickInfo.event.title}"?`)) {
-      const { error } = await supabase.from('citas').delete().eq('id', eventId);
-      if (error) {
-        console.error('Error al eliminar cita:', error);
-      } else {
-        await fetchAppointments();
-      }
+    const eventId = clickInfo.event.id; // ID del evento
+    const { data, error } = await supabase.from('citas').select().eq('id', eventId).single();
+
+    if (error) {
+        console.error('Error al cargar la cita:', error);
+        return;
     }
-  };
+
+    setSelectedEvent(data); // Establece la cita seleccionada en el estado
+    setModalOpenIs(true); // Abre el modal
+};
 
   const currentDate = new Date();
   const currentDateString = currentDate.toISOString().split('T')[0];
@@ -241,8 +246,13 @@ const Calendario = () => {
          initialView="dayGridMonth"
          selectable={true}
          editable={true}
-         events={events}
-         eventClick={(clickInfo) => { /* función para manejar clic en evento */ }}
+         events={events}  // Los eventos que se mostrarán en el calendario
+         eventContent={(eventInfo) => (
+          <div style={{backgroundColor: '#134c8f', color: 'white', borderRadius:'5px', padding: '1px'}}>
+            <b>{eventInfo.event.title}</b>
+          </div>
+        )}
+         eventClick={handleEventClick}
          dateClick={handleDateClick}
          weekends={true}
          validRange={{
@@ -278,51 +288,38 @@ const Calendario = () => {
         <h2>Registrar nueva cita</h2>
         <p>Fecha seleccionada: {selectedDate}</p>
 
+        
+        <div style={{fontSize:'20px', marginBottom:'20px'}}>
         <label>
-          Nombre de la cita:
-          <input
-            type="text"
-            value={name}
-            readOnly
-            placeholder="Introduce el nombre de la cita"
-            style={{ margin: '10px 0', padding: '5px', width: '100%' }}
-          />
+          Correo electrónico:<br></br>
+           {user.email}
+          
         </label>
-
-        <label>
-          Correo electrónico:
-          <input
-              type="email"
-              value={email}
-              onChange={handleEmailChange}
-              placeholder="Introduce tu correo electrónico"
-              style={{ margin: '10px 0', padding: '5px', width: '100%' }}
-            />
-        </label>
-        {!isEmailValid && (
-          <p style={{ color: 'red' }}>Por favor, introduce un correo electrónico válido.</p>
-        )}
-
+        </div>
         <div>
-          {availableTimes.map((time) => (
-            <button
-              key={time}
-              onClick={() => setSelectedTime(time)}
-              disabled={events.some(event => event.start === `${selectedDate}T${time}:00`) || (selectedDate === currentDateString && time < currentTime)}
-              style={{
-                margin: '5px',
-                padding: '10px',
-                backgroundColor: selectedTime === time ? '#007bff' : '#f0f0f0',
-                borderRadius: '5px',
-                cursor: 'pointer',
-              }}
-            >
-              {time}
-            </button>
-          ))}
+        {availableTimes.map((time) => {
+    const isPastTime = selectedDate === currentDateString && time < currentTime;
+    return (
+      <button
+        key={time}
+        onClick={() => setSelectedTime(time)}
+        disabled={isPastTime || events.some(event => event.start === `${selectedDate}T${time}:00`)}
+        style={{
+          margin: '5px',
+          padding: '10px',
+          backgroundColor: selectedTime === time ? '#007bff' : '#f0f0f0',
+          borderRadius: '5px',
+          cursor: 'pointer',
+        }}
+      >
+        {time}
+      </button>
+    );
+  })}
+
         </div>
 
-        <button onClick={handleTimeSelect} disabled={!selectedTime || !appointmentTitle || !email || !isEmailValid} style={{ marginTop: '10px' }}>
+        <button onClick={handleTimeSelect} disabled={!selectedTime} style={{ marginTop: '10px' }}>
           Confirmar Cita
         </button>
         <button onClick={closeModal} style={{ marginTop: '10px', marginLeft: '10px' }}>
@@ -330,7 +327,78 @@ const Calendario = () => {
         </button>
       </Modal>
 
-
+      <Modal
+    isOpen={modalOpenIs}
+    onRequestClose={() => setModalOpenIs(false)} // Cierra el modal
+    contentLabel="Información de la cita"
+    style={{
+      content: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        right: 'auto',
+        bottom: 'auto',
+        marginRight: '-50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: '1000',
+        borderRadius: '10px',
+        padding: '20px',
+        width: '80%',
+        maxWidth: '400px',
+      },
+      overlay: {
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        zIndex: '999',
+      },
+    }}
+>
+    <h2>Detalles de la Cita</h2>
+    {selectedEvent && (
+        <div>
+            <p><strong>Usuario:</strong> {selectedEvent.email}</p>
+            <p><strong>Fecha:</strong> {selectedEvent.date}</p>
+            <p><strong>Hora:</strong> {selectedEvent.start_time}-{selectedEvent.end_time}</p>
+            <button
+                onClick={async () => {
+                    const { error } = await supabase.from('citas').delete().eq('id', selectedEvent.id);
+                    if (error) {
+                        console.error('Error al eliminar la cita:', error);
+                    } else {
+                        setModalOpenIs(false); // Cierra el modal
+                        setEvents(events.filter(event => event.id !== selectedEvent.id)); // Elimina del estado local
+                        alert('Cita eliminada correctamente');
+                    }
+                }}
+                style={{
+                    marginTop: '10px',
+                    padding: '10px 20px',
+                    backgroundColor: '#dc3545',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    
+                }}
+            >
+                Eliminar Cita
+            </button>
+        </div>
+    )}
+      <button
+        onClick={() => setModalOpenIs(false)}  // Cerrar el modal sin eliminar
+        style={{
+          marginTop: '10px',
+          padding: '10px 20px',
+          backgroundColor: '#6c757d',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',
+        }}
+      >
+        Cerrar
+      </button>
+</Modal>
 
       <Modal
           isOpen={infoModalIsOpen}
@@ -412,9 +480,9 @@ const Calendario = () => {
           <ul>
             {pastAppointments.map((cita) => (
               <li key={cita.id}>
-                <p><strong>{cita.title}</strong></p>
-                <p>Fecha: {cita.date}</p>
-                <p>Hora: {cita.start_time}</p>
+                <p><strong>Usuario:</strong> {selectedEvent.email}</p>
+                <p><strong>Fecha:</strong> {selectedEvent.date}</p>
+                <p><strong>Hora:</strong> {selectedEvent.start_time}-{selectedEvent.end_time}</p>
               </li>
             ))}
           </ul>

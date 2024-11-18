@@ -17,7 +17,16 @@ const Header = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null); // Elimina el usuario del contexto
+    navigate('/'); // Redirige al usuario al inicio
+  };
+
+  const handleProtectedNavigation = (path) => {
+    if (!user) {
+      alert('Por favor, inicia sesión para acceder a esta página.');
+      navigate('/'); // Redirige a Home
+    } else {
+      navigate(path); // Navega a la ruta protegida
+    }
   };
   
 
@@ -30,18 +39,18 @@ const Header = () => {
             <img className='img2' src={img2} /><p>Tus unicodes:</p>
         </div>
         <div className='inicio'>
-      <a href='/'>Inicio</a>
-      <a href='calendario'>Calendario</a>
-      <a href='perfil'>Perfil</a>
-      <a href='tienda'>Tienda</a>
-      <a href='tutorias'>Mis Tutorías</a>
+          <a href='/'>Inicio</a>
+          <a onClick={() => handleProtectedNavigation('/calendario')}>Calendario</a>
+          <a onClick={() => handleProtectedNavigation('/perfil')}>Perfil</a>
+          <a onClick={() => handleProtectedNavigation('/tienda')}>Tienda</a>
+          <a onClick={() => handleProtectedNavigation('/tutorias')}>Mis Tutorías</a>
       {user ? (
         <>
-          <p>Bienvenido, {user.email}</p>
-          <button style={{backgroundColor: '#134c8f', border: 'none', color:'white', fontSize:'16px'}} onClick={handleLogout}>Cerrar sesión</button>
+          <p style={{color:'white'}}>Bienvenido, {user.email}</p>
+          <button href='/' style={{backgroundColor: '#134c8f', border: 'none', color:'white', fontSize:'16px'}} onClick={handleLogout}>Cerrar sesión</button>
         </>
       ) : (
-        <a href='/'>Inicia Sesión</a>
+        <a href='/'onClick={handleButtonClick}>Inicia Sesión</a>
       )}
       </div>
     </div>
