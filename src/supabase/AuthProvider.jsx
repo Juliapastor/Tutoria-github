@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "./client";
 
+
 const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 const login = (email, password) =>
   supabase.auth.signInWithPassword({ email, password });
+
 
 const signOut = () => supabase.auth.signOut();
 
@@ -48,6 +50,8 @@ const updatePassword = (updatedPassword) =>
       };
     }, []);
 
+    
+
   return (
     <AuthContext.Provider
     value={{
@@ -63,5 +67,7 @@ const updatePassword = (updatedPassword) =>
     
   );
 };
+
+
 
 export default AuthProvider;
