@@ -64,9 +64,19 @@ const Calendario = () => {
   };
 
   const fetchPastAppointments = async () => {
+    if (!user) {
+      console.error('Usuario no autenticado.');
+      return;
+    }
+  
     const currentDate = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase.from('citas').select().lt('date', currentDate).order('date', { ascending: false });
-
+    const { data, error } = await supabase
+      .from('citas')
+      .select()
+      .eq('email', user.email) // Filtra las citas por el email del usuario autenticado
+      .lt('date', currentDate) // Solo citas con fecha pasada
+      .order('date', { ascending: false });
+  
     if (error) {
       console.error('Error al cargar citas pasadas:', error);
     } else {
@@ -145,42 +155,153 @@ const Calendario = () => {
   };
 
   const handleTimeSelect = async () => {
-    const endTime = String(Number(selectedTime.split(':')[0]) + 1).padStart(2, '0') + ':00';
-
-    const { error } = await supabase.from('citas').insert([
-      {
-        email: user.email,
-        date: selectedDate,
-        start_time: selectedTime,
-        end_time: endTime,
-        
-      },
-    ]);
-
-    if (error) {
-      console.error('Error al agregar cita:', error);
-      setSuccessMessage('Error al guardar la cita');
+    try {
+      // Verifica si el usuario tiene tokens disponibles
+      const { data: payment, error: fetchError } = await supabase
+        .from('Pagos')
+        .select('token')
+        .eq('email', user.email)
+        .single();
+  
+      if (fetchError) {
+        console.error('Error al verificar los tokens:', fetchError);
+        setSuccessMessage('No tienes tokens suficientes para reservar una cita.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
+  
+      // Si no tiene tokens o los tokens son 0
+      if (!payment || payment.token <= 0) {
+        setSuccessMessage('No tienes tokens suficientes para reservar una cita.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
+  
+      // Si tiene tokens, continúa con la creación de la cita
+      const endTime =
+        String(Number(selectedTime.split(':')[0]) + 1).padStart(2, '0') + ':00';
+  
+      const { error: insertError } = await supabase.from('citas').insert([
+        {
+          email: user.email,
+          date: selectedDate,
+          start_time: selectedTime,
+          end_time: endTime,
+        },
+      ]);
+  
+      if (insertError) {
+        console.error('Error al agregar cita:', insertError);
+        setSuccessMessage('Error al guardar la cita.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
+  
+      // Descuenta un token al usuario en la tabla `Pagos`
+      const { error: updateError } = await supabase
+        .from('Pagos')
+        .update({ token: payment.token - 1 })
+        .eq('email', user.email);
+  
+      if (updateError) {
+        console.error('Error al actualizar tokens:', updateError);
+        setSuccessMessage(
+          'La cita se guardó, pero hubo un problema al actualizar tus tokens.'
+        );
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
+  
+      setSuccessMessage('Cita elegida con éxito. Se ha descontado un token.');
       setTimeout(() => setSuccessMessage(''), 3000);
-    } else {
-      setSuccessMessage('Cita elegida con éxito');
+      await fetchAppointments(); // Actualiza las citas en el calendario
+      closeModal(); // Cierra el modal
+    } catch (error) {
+      console.error('Error inesperado:', error);
+      setSuccessMessage('Ocurrió un error inesperado.');
       setTimeout(() => setSuccessMessage(''), 3000);
-      await fetchAppointments();
-      closeModal();
     }
   };
+  
 
   const handleEventClick = async (clickInfo) => {
     const eventId = clickInfo.event.id; // ID del evento
-    const { data, error } = await supabase.from('citas').select().eq('id', eventId).single();
-
+    const { data, error } = await supabase
+      .from('citas')
+      .select()
+      .eq('id', eventId)
+      .single();
+  
     if (error) {
-        console.error('Error al cargar la cita:', error);
-        return;
+      console.error('Error al cargar la cita:', error);
+      return;
     }
-
+  
     setSelectedEvent(data); // Establece la cita seleccionada en el estado
     setModalOpenIs(true); // Abre el modal
-};
+  };
+  
+  const deleteAppointment = async () => {
+    if (!selectedEvent) return;
+  
+    try {
+      // Elimina la cita
+      const { error: deleteError } = await supabase
+        .from('citas')
+        .delete()
+        .eq('id', selectedEvent.id);
+  
+      if (deleteError) {
+        console.error('Error al eliminar la cita:', deleteError);
+        alert('Error al eliminar la cita.');
+        return;
+      }
+  
+      // Recupera los tokens actuales del usuario
+      const { data: payment, error: fetchError } = await supabase
+        .from('Pagos')
+        .select('token')
+        .eq('email', selectedEvent.email)
+        .single();
+  
+      if (fetchError) {
+        console.error('Error al recuperar los tokens:', fetchError);
+        alert('Cita eliminada, pero no se pudo actualizar los tokens.');
+        return;
+      }
+  
+      if (!payment) {
+        console.error('No se encontró el registro del usuario en la tabla Pagos.');
+        alert('Cita eliminada, pero no se encontró el registro del usuario en Pagos.');
+        return;
+      }
+  
+      // Incrementa los tokens sumando 1
+      const currentTokens = payment.token || 0; 
+      const newTokenCount = currentTokens + 1;
+  
+      const { error: updateError } = await supabase
+        .from('Pagos')
+        .update({ token: newTokenCount })
+        .eq('email', selectedEvent.email);
+  
+      if (updateError) {
+        console.error('Error al actualizar los tokens:', updateError);
+        alert('Cita eliminada, pero no se pudo actualizar los tokens.');
+        return;
+      }
+  
+      // Actualiza la UI
+      setEvents(events.filter((event) => event.id !== selectedEvent.id));
+      setModalOpenIs(false);
+      alert('Cita eliminada correctamente. Se ha sumado un token.');
+    } catch (error) {
+      console.error('Error inesperado:', error);
+      alert('Ocurrió un error inesperado al eliminar la cita.');
+    }
+  };
+  
+  
 
   const currentDate = new Date();
   const currentDateString = currentDate.toISOString().split('T')[0];
@@ -359,29 +480,19 @@ const Calendario = () => {
             <p><strong>Fecha:</strong> {selectedEvent.date}</p>
             <p><strong>Hora:</strong> {selectedEvent.start_time}-{selectedEvent.end_time}</p>
             <button
-                onClick={async () => {
-                    const { error } = await supabase.from('citas').delete().eq('id', selectedEvent.id);
-                    if (error) {
-                        console.error('Error al eliminar la cita:', error);
-                    } else {
-                        setModalOpenIs(false); // Cierra el modal
-                        setEvents(events.filter(event => event.id !== selectedEvent.id)); // Elimina del estado local
-                        alert('Cita eliminada correctamente');
-                    }
-                }}
-                style={{
-                    marginTop: '10px',
-                    padding: '10px 20px',
-                    backgroundColor: '#dc3545',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    
-                }}
-            >
-                Eliminar Cita
-            </button>
+  onClick={deleteAppointment} // Llama a la nueva función
+  style={{
+    marginTop: '10px',
+    padding: '10px 20px',
+    backgroundColor: '#dc3545',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  }}
+>
+  Eliminar Cita
+</button>
         </div>
     )}
       <button
@@ -432,78 +543,77 @@ const Calendario = () => {
     </div>
     
       
-      <button
-        onClick={fetchPastAppointments}
-        style={{
-          fontSize: '20px',
-          marginTop: '-50px',
-          marginBottom:'60px',
-          padding: '10px 20px',
-          backgroundColor: '#134c8f',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-        }}
-      >
-        Ver citas pasadas
-      </button>
+    <button
+  onClick={fetchPastAppointments}
+  style={{
+    fontSize: '20px',
+    marginTop: '-50px',
+    marginBottom: '60px',
+    padding: '10px 20px',
+    backgroundColor: '#134c8f',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  }}
+>
+  Ver citas pasadas
+</button>
 
-      
-      <Modal
-        isOpen={pastAppointmentsModalOpen}
-        onRequestClose={closePastAppointmentsModal}
-        contentLabel="Citas Pasadas"
-        style={{
-          content: {
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            right: 'auto',
-            bottom: 'auto',
-            marginRight: '-50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: '1000',
-            borderRadius: '10px',
-            padding: '20px',
-            width: '80%',
-            maxWidth: '400px',
-          },
-          overlay: {
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            zIndex: '999',
-          },
-        }}
-      >
-        <h2>Citas Pasadas</h2>
-        {pastAppointments.length > 0 ? (
-          <ul>
-            {pastAppointments.map((cita) => (
-              <li key={cita.id}>
-                <p><strong>Usuario:</strong> {selectedEvent.email}</p>
-                <p><strong>Fecha:</strong> {selectedEvent.date}</p>
-                <p><strong>Hora:</strong> {selectedEvent.start_time}-{selectedEvent.end_time}</p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No hay citas pasadas</p>
-        )}
-        <button
-          onClick={closePastAppointmentsModal}
-          style={{
-            marginTop: '20px',
-            padding: '10px 20px',
-            backgroundColor: '#dc3545',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-          }}
-        >
-          Cerrar
-        </button>
-      </Modal>
+<Modal
+  isOpen={pastAppointmentsModalOpen}
+  onRequestClose={closePastAppointmentsModal}
+  contentLabel="Citas Pasadas"
+  style={{
+    content: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      right: 'auto',
+      bottom: 'auto',
+      marginRight: '-50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: '1000',
+      borderRadius: '10px',
+      padding: '20px',
+      width: '80%',
+      maxWidth: '400px',
+    },
+    overlay: {
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      zIndex: '999',
+    },
+  }}
+>
+  <h2>Citas Pasadas</h2>
+  {pastAppointments.length > 0 ? (
+    <ul>
+      {pastAppointments.map((cita) => (
+        <li key={cita.id}>
+          <p><strong>Usuario:</strong> {cita.email}</p>
+          <p><strong>Fecha:</strong> {cita.date}</p>
+          <p><strong>Hora:</strong> {cita.start_time} - {cita.end_time}</p>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p>No hay citas pasadas</p>
+  )}
+  <button
+    onClick={closePastAppointmentsModal}
+    style={{
+      marginTop: '20px',
+      padding: '10px 20px',
+      backgroundColor: '#dc3545',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer',
+    }}
+  >
+    Cerrar
+  </button>
+</Modal>
     </div>
     
   );
